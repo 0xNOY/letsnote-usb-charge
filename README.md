@@ -8,6 +8,10 @@ The project contains an independent GPL-licensed kernel driver for Panasonic's
 was derived by static analysis of the official Panasonic PC Settings Utility;
 see [the reverse-engineering notes](docs/reverse-engineering.md).
 
+The read path has been validated on a CF-SZ6-1L with BIOS V1.11L10 and Linux
+7.1.4: the driver found a checksum-valid MISC table, completed the firmware
+query, and reported the same setting consistently through all sysfs controls.
+
 > [!CAUTION]
 > This driver invokes a vendor-specific System Management Interrupt. It is
 > restricted to CF-SZ6 by default, discovers the SMI parameters from the BIOS,

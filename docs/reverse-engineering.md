@@ -66,6 +66,19 @@ does not hard-code the machine-specific SMI port or command. Probe performs a
 read-only query. A firmware write happens only after root writes a sysfs
 attribute.
 
+## Hardware validation
+
+The read-only probe and status query were tested on the target CF-SZ6-1L with
+BIOS V1.11L10 and Linux 7.1.4. The runtime-discovered values were:
+
+- MISC table physical address: `0xfe600`
+- ASMI type: `2` (memory mode)
+- SMI trigger port: `0xb2`
+- initial firmware flags: `0x10` (always-on and AC-only both disabled)
+
+These values are recorded as validation evidence only. The driver continues to
+discover them from firmware and does not use them as constants.
+
 ## Public references
 
 - [Panasonic PC Settings Utility in Microsoft Store](https://apps.microsoft.com/detail/9n960x393mtv)
