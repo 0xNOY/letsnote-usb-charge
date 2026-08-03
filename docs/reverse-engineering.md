@@ -1,90 +1,66 @@
-# Reverse-engineering notes
+# Protocol notes
 
-## Scope and provenance
+The implementation was derived from static analysis of software installed on
+a CF-SZ6. Panasonic binaries are not included in this repository.
 
-This project is an independent Linux implementation based on static analysis
-of software already installed on a CF-SZ6. No Panasonic executable, driver,
-resource, cryptographic key, or decompiled source is redistributed.
+## Analyzed files
 
-The analyzed Microsoft Store package was
-`PanasonicCorporation.PanasonicPCSettingsUtility_10.12910.100.0_x64__eewqyxmkz9mn0`.
-The relevant executable was `Control/Ui0024/UsbCharge.exe`:
+| File | SHA-256 |
+| --- | --- |
+| `Control/Ui0024/UsbCharge.exe` | `91f6c53618519a5cfe7cdfb3f868108ebdd08a55c5247a31be6a8662b82f5a48` |
+| `Windows/System32/drivers/sid0021.sys` | `afb534b29d1287ae248e2906022615e5e89846c4db73568040e53090f9c88b0a` |
 
-- size: 257,728 bytes
-- PE timestamp: 2017-07-18 18:50:21
-- SHA-256: `91f6c53618519a5cfe7cdfb3f868108ebdd08a55c5247a31be6a8662b82f5a48`
-- embedded product name: `USB Charge Setting Utility`
+`sid0040.inf` version 5.0.1200.0 associates `sid0021.sys` with
+`ACPI\\MAT0021`. Linux exposes it as `MAT0021:00` at ACPI path
+`\\_SB_.MISC`.
 
-The Windows System Interface Device driver installed for `ACPI\\MAT0021` was
-`sid0021.sys`:
+## USB charge packet
 
-- SHA-256: `afb534b29d1287ae248e2906022615e5e89846c4db73568040e53090f9c88b0a`
-- embedded description: `System Interface Device Driver - 0021`
+CF-SZ6 uses this 12-byte MISC packet:
 
-The driver-store INF (`sid0040.inf`, version `5.0.1200.0`) associates
-`ACPI\\MAT0021` with that driver. Linux exposes the same firmware device as
-`/sys/bus/acpi/devices/MAT0021:00`, with ACPI path `\\_SB_.MISC`.
-
-## Application protocol
-
-The PC Settings Utility calls the vendor driver with two consecutive MISC
-packets wrapped in the driver's authenticated IOCTL transport. The inner packet
-used on CF-SZ6 (the application's `LIGHT` model path) has this 12-byte layout:
-
-| Offset | Size | Meaning |
+| Offset | Size | Value |
 | ---: | ---: | --- |
-| 0 | 1 | function (`0x1e`; overwritten with result) |
-| 1 | 1 | subfunction (`0x02`) |
-| 2 | 2 | input size (`0x000c`) |
-| 4 | 2 | output size (`0x000c`) |
-| 6 | 2 | reserved (`0`) |
-| 8 | 2 | USB-charge selector (`0x8bc0`) |
-| 10 | 1 | query opcode (`0x80`) or settings flags |
-| 11 | 1 | query (`0`) or write mask (`0xff`) |
+| 0 | 1 | function `0x1e`; firmware result after the call |
+| 1 | 1 | subfunction `0x02` |
+| 2 | 2 | input size `0x000c` |
+| 4 | 2 | output size `0x000c` |
+| 6 | 2 | reserved |
+| 8 | 2 | selector `0x8bc0` |
+| 10 | 1 | query `0x80` or setting flags |
+| 11 | 1 | query `0x00` or write mask `0xff` |
 
-For a write, bit `0x02` is always set, bit `0x04` controls power-off/always-on
-charging, and bit `0x08` selects AC-only operation. The application first
-queries the current flags and then constructs a write packet so the two user
-settings remain consistent.
+Write flags are `0x02`, plus `0x04` for power-off charging and `0x08` for
+AC-only operation. The current flags are queried before each write.
 
-## Firmware transport
+## SMI transport
 
-The Windows driver does not evaluate an ACPI method for this operation. It:
+The Windows driver:
 
-1. maps physical `0xf0000..0xfffff`;
-2. searches every `0x80` bytes from `0xfc000` for signature `MEI_`;
-3. validates an 8-bit additive checksum, with the length read from table byte
-   `0x14` in units of `0x10` bytes;
-4. reads ASMI type from table offset `0x17`, the SMI port from `0x52`, and the
-   SMI command value from `0x54`;
-5. puts the low 32 bits of the physical packet address in `ESI`; and
-6. triggers the synchronous SMI with `OUT DX, AL`.
+1. maps physical memory at `0xf0000..0xfffff`;
+2. searches from `0xfc000` in `0x80`-byte steps for `MEI_`;
+3. validates the table's 8-bit additive checksum;
+4. reads ASMI type at offset `0x17`, the SMI port at `0x52`, and command value
+   at `0x54`;
+5. places the packet's 32-bit physical address in `ESI`; and
+6. executes `OUT DX, AL`.
 
-The Linux driver reproduces only this small transport and only on Panasonic
-CF-SZ6 systems. It discovers and validates the firmware table at runtime; it
-does not hard-code the machine-specific SMI port or command. Probe performs a
-read-only query. A firmware write happens only after root writes a sysfs
-attribute.
+The Linux driver follows the same sequence. It queries the firmware during
+probe and writes only through root-owned sysfs attributes.
 
-## Hardware validation
+## CF-SZ6 validation
 
-The read-only probe and status query were tested on the target CF-SZ6-1L with
-BIOS V1.11L10 and Linux 7.1.4. The runtime-discovered values were:
+Test system: CF-SZ6-1L, BIOS V1.11L10, Linux 7.1.4.
 
-- MISC table physical address: `0xfe600`
-- ASMI type: `2` (memory mode)
-- SMI trigger port: `0xb2`
-- initial firmware flags: `0x10` (always-on and AC-only both disabled)
+- MISC table: `0xfe600`
+- ASMI type: `2`
+- SMI port: `0xb2`
+- initial flags: `0x10`
+- flags after enabling power-off charging: `0x16`
 
-Enabling always-on charging succeeded and two immediate readbacks both
-returned `0x16`. This confirms that bit `0x04` was set while AC-only bit `0x08`
-remained clear; the firmware-provided bit `0x10` was also retained.
+The driver discovers these values at runtime; they are not hard-coded.
 
-These values are recorded as validation evidence only. The driver continues to
-discover them from firmware and does not use them as constants.
+## References
 
-## Public references
-
-- [Panasonic PC Settings Utility in Microsoft Store](https://apps.microsoft.com/detail/9n960x393mtv)
-- [Panasonic USB Charge Setting Utility support page](https://global-pc-support.connect.panasonic.com/dldocs/69612)
+- [Panasonic PC Settings Utility](https://apps.microsoft.com/detail/9n960x393mtv)
+- [Panasonic USB Charge Setting Utility](https://global-pc-support.connect.panasonic.com/dldocs/69612)
 - [Linux `panasonic-laptop` driver](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/platform/x86/panasonic-laptop.c)
