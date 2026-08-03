@@ -76,6 +76,10 @@ BIOS V1.11L10 and Linux 7.1.4. The runtime-discovered values were:
 - SMI trigger port: `0xb2`
 - initial firmware flags: `0x10` (always-on and AC-only both disabled)
 
+Enabling always-on charging succeeded and two immediate readbacks both
+returned `0x16`. This confirms that bit `0x04` was set while AC-only bit `0x08`
+remained clear; the firmware-provided bit `0x10` was also retained.
+
 These values are recorded as validation evidence only. The driver continues to
 discover them from firmware and does not use them as constants.
 
