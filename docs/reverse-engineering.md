@@ -1,7 +1,9 @@
-# Protocol notes
+# Reverse-engineered firmware protocol
 
-The implementation was derived from static analysis of software installed on
-a CF-SZ6. Panasonic binaries are not included in this repository.
+This document records the firmware command used to control powered-off USB
+charging on the CF-SZ6. The implementation was derived from static analysis of
+Panasonic software installed on the Windows partition. Panasonic binaries are
+not included in this repository.
 
 ## Analyzed files
 

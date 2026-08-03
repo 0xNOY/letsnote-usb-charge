@@ -8,34 +8,45 @@ vendor-specific SMI, so save your work before loading it for the first time.
 
 ## Build
 
-Install `base-devel`, the headers for the running kernel, and optionally DKMS.
-On Arch Linux:
+Install `base-devel` and the headers matching the running kernel. DKMS is only
+needed for the persistent installation described below. On Arch Linux:
 
-```console
-$ sudo pacman -S --needed base-devel linux-headers dkms
-$ make check
-$ sudo insmod ./panasonic_usb_charge.ko
+```bash
+sudo pacman -S --needed base-devel linux-headers
+make W=1 check
 ```
+
+`make check` builds the kernel module and command-line tool, then runs the
+protocol test.
 
 ## Usage
 
-```console
-$ ./letsnote-usb-charge status
-$ sudo ./letsnote-usb-charge enable
-$ sudo ./letsnote-usb-charge disable
-$ sudo ./letsnote-usb-charge ac-only
-$ sudo ./letsnote-usb-charge battery-ok
+Load the module before using the command-line tool:
+
+```bash
+sudo insmod ./panasonic_usb_charge.ko
+./letsnote-usb-charge status
+sudo ./letsnote-usb-charge enable
 ```
 
-`enable` allows charging while the computer is powered off. `ac-only` limits
-it to times when the AC adapter is connected. The setting is stored by the
-firmware.
+| Command | Effect |
+| --- | --- |
+| `status` | Show the current firmware settings. |
+| `enable` | Enable charging from the `CHG` port while powered off. |
+| `disable` | Disable charging while powered off. |
+| `ac-only` | Require the AC adapter for powered-off charging. |
+| `battery-ok` | Allow powered-off charging from the laptop battery. |
+
+The charging and power-source settings are independent and are stored by the
+firmware. For example, use `enable` followed by `ac-only` to charge while
+powered off only when the AC adapter is connected.
 
 ## DKMS installation
 
-```console
-$ sudo make dkms-install
-$ sudo modprobe panasonic_usb_charge
+```bash
+sudo pacman -S --needed dkms
+sudo make dkms-install
+sudo modprobe panasonic_usb_charge
 ```
 
 To load the module at boot, put `panasonic_usb_charge` in
