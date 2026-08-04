@@ -58,6 +58,7 @@ Test system: CF-SZ6-1L, BIOS V1.11L10, Linux 7.1.4.
 - SMI port: `0xb2`
 - initial flags: `0x10`
 - flags after enabling power-off charging: `0x16`
+- power from the `CHG` port after a normal shutdown: confirmed
 
 The driver discovers these values at runtime; they are not hard-coded.
 
