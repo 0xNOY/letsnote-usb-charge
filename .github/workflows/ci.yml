@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  userspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and test protocol and CLI
+        run: |
+          make letsnote-usb-charge tests/protocol_test
+          ./tests/protocol_test
+          ./letsnote-usb-charge --help >/dev/null
+
+  kernel-module:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install kernel headers
+        run: pacman -Syu --noconfirm linux-headers pahole
+      - uses: actions/checkout@v7
+      - name: Build module with warnings enabled
+        run: |
+          kdir=$(find -L /usr/lib/modules -mindepth 2 -maxdepth 2 -type d -name build -print -quit)
+          test -n "$kdir"
+          make KDIR="$kdir" W=1 modules
